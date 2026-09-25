@@ -21,6 +21,7 @@ agent = StructuredOutputAgent(
     max_retries=3,
 )
 
+
 article = """
 The stock market experienced a significant downturn today, with major indices falling sharply. Investors are concerned about
 """
