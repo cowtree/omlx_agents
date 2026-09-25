@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from app.agent import StructuredOutputAgent
+from app.models import ArticalAnalysis,EntityExtraction
 
 load_dotenv()
 
@@ -21,12 +22,44 @@ agent = StructuredOutputAgent(
     max_retries=3,
 )
 
-
 article = """
-The stock market experienced a significant downturn today, with major indices falling sharply. Investors are concerned about
+A biotechnology company announced positive results from a clinical
+trial of its new cancer treatment.
+
+The company reported that patients receiving the treatment showed
+improved outcomes compared with the control group.
 """
 
-result = agent.analyze_article(article)
+prompt = f"""
+Analyze the following article.
+
+ARTICLE:
+{article}
+"""
+
+result = agent.run(
+    prompt=prompt,
+    output_model=ArticalAnalysis
+)
 
 print("Analysis Result:")
 print(result.model_dump_json(indent=4))
+
+
+text = """
+Sam Altman spoke at an OpenAI event in San Francisco.
+Several researchers from Microsoft also attended.
+"""
+
+entities = agent.run(
+    prompt=f"""
+Extract the entities from this text:
+
+{text}
+""",
+    output_model=EntityExtraction,
+)
+
+
+print("\nENTITIES")
+print(entities.model_dump_json(indent=2))

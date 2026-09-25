@@ -1,34 +1,38 @@
 from openai import OpenAI
-from pydantic import ValidationError
+from typing import TypeVar
+from pydantic import BaseModel,ValidationError
 import json
 
-from app.models import ArticalAnalysis
+T = TypeVar("T", bound=BaseModel)
 
 class StructuredOutputAgent:
-    def __init__(self, client: OpenAI, model: str, thinking: bool = False, max_retries: int = 3):
+
+    def __init__(self, client: OpenAI, 
+                model: str, 
+                thinking: bool = False, 
+                max_retries: int = 3):
         self.client = client
         self.model = model
         self.thinking = thinking
         self.max_retries = max_retries
 
-    def analyze_article(self, article_text: str):
+    def run(self,
+            prompt: str,
+            output_model: type[T],
+            ) -> T:
 
-        schema = ArticalAnalysis.model_json_schema()
+        schema = output_model.model_json_schema()
         schema_json = json.dumps(schema, indent=4)
 
-        prompt = f"""
-        Analyze this article.
+        initial_prompt = f"""
+
+        {prompt}
 
         Your response MUST satisfy this JSON schema:
         {schema_json}
 
         Return ONLY valid JSON.
         Do not include markdown or explanations.
-
-
-        ARTICLE:
-        {article_text}
-
         """
 
         last_output = None
@@ -41,32 +45,32 @@ class StructuredOutputAgent:
 
             # First attempt
             if attempt == 1:
-                current_prompt = prompt
+                current_prompt = initial_prompt
 
             # Repair attempt
             else:
                 current_prompt = f"""
-                Your previous response failed schema validation.
+                    Your previous response failed schema validation.
 
-                JSON schema:
-                {schema_json}
+                    JSON schema:
+                    {schema_json}
 
-                Previous response:
-                {last_output}
+                    Previous response:
+                    {last_output}
 
-                Validation error:
-                {last_error}
+                    Validation error:
+                    {last_error}
 
-                Fix the response so that it satisfies the JSON schema
+                    Fix the response so that it satisfies the JSON schema
 
-                Return ONLY the correct JSON
+                    Return ONLY the correct JSON
                 """
 
 
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You analyze news articles and respond in JSON."},
+                    {"role": "system", "content": "You extract structured data from text and respond in JSON."},
                     {"role": "user", "content": current_prompt},
                 ],
                 temperature=0.2,
@@ -76,7 +80,7 @@ class StructuredOutputAgent:
             raw_output = response.choices[0].message.content
 
             try:
-                result = ArticalAnalysis.model_validate_json(raw_output)
+                result = output_model.model_validate_json(raw_output)
                 print("Valid successful response from LLM")
                 return result
 
@@ -89,3 +93,4 @@ class StructuredOutputAgent:
 
         raise RuntimeError(f"Failed to get valid response from LLM after "
                             f"{self.max_retries} attempts.")
+

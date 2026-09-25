@@ -23,6 +23,19 @@ class ArticalAnalysis(BaseModel):
                         le=1.0 
     )
 
+
+class EntityExtraction(BaseModel):
+
+    people: list[str] = Field(
+                        description="List of people mentioned in the article"
+    )
+    organizations: list[str] = Field(
+                        description="List of organizations mentioned in the article"
+    )
+    locations: list[str] = Field(
+                        description="List of locations mentioned in the article"
+    )
+
 class PatientExtraction(BaseModel):
     age: int = Field(
                         description="The age of the patient",
