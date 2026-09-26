@@ -17,45 +17,37 @@ configured on this machine.
 
 ## Agents
 
-| Agent | What it shows |
-|---|---|
-| `main.py` | Basic chat completion against the local model |
-| `structured_output_agent/` | Structured output: the model analyzes an article and returns JSON that is validated with a Pydantic model, retrying up to 3 times if the output is invalid |
-
-### Structure of an agent folder
-
-```
-structured_output_agent/
-├── main.py          # entry point: reads .env, creates the client and agent, runs it
-└── app/
-    ├── agent.py     # StructuredOutputAgent: prompt, LLM call, validation and retries
-    └── models.py    # Pydantic model the output must match (ArticalAnalysis)
-```
-
-`main.py` is the only place that reads `.env`. It passes the model name and the
-thinking setting into the agent, so the agent code has no config of its own.
+| Agent | What it shows | Docs |
+|---|---|---|
+| `main.py` | Basic chat completion against the local model | |
+| `structured_output_agent/` | Turns text into validated Pydantic objects, for any output model | [docs/structured-output-agent.md](docs/structured-output-agent.md) |
 
 ### Learnings: structured output agent
 
-- **Structured output:** the prompt asks the LLM for JSON with fixed fields
-  (`title`, `summary`, `sentiment`) instead of free text, so the result can be
-  used directly by code.
-- **Validation with Pydantic:** the raw LLM output is never trusted.
-  `ArticalAnalysis.model_validate_json()` checks that it is valid JSON, that all
-  fields are present, and that `sentiment` is one of `positive`, `negative` or
-  `neutral` (enforced with `Literal`). Anything else raises a `ValidationError`.
-- **Agentic loop with retry:** LLM output is not deterministic, so a failed
-  validation is not the end. The agent calls the model again, up to
-  `max_retries` times, and returns the first response that passes validation.
-- **Fail loudly:** if every attempt fails, the agent raises a `RuntimeError`
-  instead of returning `None`, so the caller can't silently continue with a
-  missing result.
-- **Config injection:** the agent receives the client, model and thinking
-  setting from `main.py` rather than reading `.env` itself. This keeps the agent
-  reusable and easy to test with different settings.
+- **Structured output:** the LLM returns JSON matching a Pydantic model instead
+  of free text, so code can use the result directly.
+- **Generic over the output model:** `agent.run(prompt, output_model)` works with
+  any Pydantic model (article analysis, entity extraction, ...). New task = new
+  model, no agent changes.
+- **The schema is the prompt:** `model_json_schema()` puts field types,
+  descriptions and limits into the prompt, so prompt and validation can't drift
+  apart.
+- **Validation with Pydantic:** raw LLM output is never trusted;
+  `model_validate_json()` checks JSON, fields, `Literal` values and limits.
+- **Agentic loop with self-repair:** on invalid output, the agent sends the
+  model its previous answer plus the validation error and asks it to fix it, up
+  to `max_retries` times.
+- **API retries with backoff:** connection errors, timeouts and rate limits are
+  retried separately, waiting 1s, then 2s.
+- **Fail loudly:** after the last attempt the agent raises instead of returning
+  `None`.
+- **Logging:** each validation attempt and API attempt is logged, with response
+  times and token counts.
+- **Config injection:** `main.py` reads `.env` and passes the client, model and
+  thinking setting in; the agent has no config of its own.
 
-Possible next step: feed the validation error back to the model on the retry,
-so it can fix its own mistake instead of trying again with the same prompt.
+See [docs/structured-output-agent.md](docs/structured-output-agent.md) for how
+it works, example logs and known limitations.
 
 ## Getting started
 

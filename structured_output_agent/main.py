@@ -3,9 +3,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from app.agent import StructuredOutputAgent
+from app.logging_config import setup_logging
 from app.models import ArticalAnalysis,EntityExtraction
 
 load_dotenv()
+setup_logging()
 
 # Qwen "thinking" is slow but better for hard problems; toggle via OMLX_THINKING in .env
 thinking = os.getenv("OMLX_THINKING", "false").lower() in ("1", "true", "yes", "on")

@@ -1,7 +1,11 @@
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 from typing import TypeVar
 from pydantic import BaseModel,ValidationError
 import json
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -10,11 +14,15 @@ class StructuredOutputAgent:
     def __init__(self, client: OpenAI, 
                 model: str, 
                 thinking: bool = False, 
-                max_retries: int = 3):
+                max_retries: int = 3
+        ):
+        
         self.client = client
         self.model = model
         self.thinking = thinking
         self.max_retries = max_retries
+        self.api_retries = 3
+
 
     def run(self,
             prompt: str,
@@ -38,9 +46,16 @@ class StructuredOutputAgent:
         last_output = None
         last_error = None
 
+        logger.info("Running agent: output_model=%s model=%s thinking=%s",
+                    output_model.__name__, self.model, self.thinking)
+
         for attempt in range(1, self.max_retries + 1):
 
-            print(f"Attempt {attempt} of {self.max_retries}...")
+            logger.info(
+                "Validation attempt %s/%s",
+                attempt,
+                self.max_retries,
+            )
 
 
             # First attempt
@@ -66,31 +81,85 @@ class StructuredOutputAgent:
                     Return ONLY the correct JSON
                 """
 
+            logger.debug("Prompt:\n%s", current_prompt)
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You extract structured data from text and respond in JSON."},
-                    {"role": "user", "content": current_prompt},
-                ],
-                temperature=0.2,
-                extra_body={"chat_template_kwargs": {"enable_thinking": self.thinking}},
-            )
+            raw_output = self._call_llm(current_prompt)
 
-            raw_output = response.choices[0].message.content
+            logger.debug("Raw output:\n%s", raw_output)
 
             try:
                 result = output_model.model_validate_json(raw_output)
-                print("Valid successful response from LLM")
+                logger.info("Validation passed on validation attempt %d", attempt)
                 return result
 
             except ValidationError as e:
 
                 last_output = raw_output
                 last_error = str(e)
-                print("Invalid response from LLM:")
-                print(e.json(indent=4))
+                logger.warning("Validation failed on validation attempt %d (%d errors):\n%s",
+                               attempt, e.error_count(), e)
 
+        logger.error("Giving up after %d validation attempts", self.max_retries)
         raise RuntimeError(f"Failed to get valid response from LLM after "
                             f"{self.max_retries} attempts.")
+
+
+    def _call_llm(self, prompt: str) -> str:
+
+        for attempt in range(1, self.api_retries + 1):
+
+            try:
+                logger.info(
+                    "Calling LLM: API attempt %s/%s",
+                    attempt,
+                    self.api_retries,
+                )
+
+                start = time.perf_counter()
+
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You extract structured data from text and respond in JSON."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.2,
+                    extra_body={"chat_template_kwargs": {"enable_thinking": self.thinking}},
+                )
+
+                elapsed = time.perf_counter() - start
+                logger.info("LLM responded in %.1fs (%d prompt + %d completion tokens)",
+                            elapsed, response.usage.prompt_tokens, response.usage.completion_tokens)
+
+                return response.choices[0].message.content
+
+            except (
+                APIConnectionError,
+                APITimeoutError,
+                RateLimitError,
+            ) as error:
+
+                logger.warning(
+                    "API call failed on attempt %s: %s",
+                    attempt,
+                    error,
+                )
+
+                if attempt == self.api_retries:
+                    logger.error(
+                        "API failed after %s attempts",
+                        self.api_retries,
+                    )
+                    raise
+
+                delay = 2 ** (attempt -1) 
+
+                logger.info(
+                    "Retrying API call in %s seconds",
+                    delay
+                )
+
+                time.sleep(delay)
+
+        raise RuntimeError("Unexpected API retry state.")
 
