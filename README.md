@@ -72,6 +72,17 @@ Requires [uv](https://docs.astral.sh/uv/) and a running oMLX server.
 
    The basic chat script runs from the project root with `uv run main.py`.
 
+### Running tests
+
+```bash
+uv run pytest
+```
+
+Tests live in `structured_output_agent/tests/`, one test class per challenge
+(reliable outputs, schema validation, error handling, retry logic, logging,
+continue safely). They use a fake client with scripted replies, so they run in
+milliseconds and don't need the oMLX server.
+
 ### Thinking mode
 
 Qwen models can "think" before answering. This improves results on hard problems
