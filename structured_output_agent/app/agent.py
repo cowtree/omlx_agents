@@ -5,6 +5,8 @@ import json
 import logging
 import time
 
+from app.result import AgentResult
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
@@ -24,10 +26,11 @@ class StructuredOutputAgent:
         self.api_retries = 3
 
 
-    def run(self,
+    def run(
+            self,
             prompt: str,
             output_model: type[T],
-            ) -> T:
+            ) -> AgentResult[T]:
 
         schema = output_model.model_json_schema()
         schema_json = json.dumps(schema, indent=4)
@@ -90,7 +93,12 @@ class StructuredOutputAgent:
             try:
                 result = output_model.model_validate_json(raw_output)
                 logger.info("Validation passed on validation attempt %d", attempt)
-                return result
+                return AgentResult(
+                        success=True,
+                        data=result,
+                        error=None,
+                        attempts=attempt,
+                    )
 
             except ValidationError as e:
 
@@ -100,8 +108,17 @@ class StructuredOutputAgent:
                                attempt, e.error_count(), e)
 
         logger.error("Giving up after %d validation attempts", self.max_retries)
-        raise RuntimeError(f"Failed to get valid response from LLM after "
-                            f"{self.max_retries} attempts.")
+        return AgentResult(
+                            success=False,
+                            data=None,
+                            error=(
+                                f"Model failed to produce valid "
+                                f"{output_model.__name__} output "
+                                f"after {self.max_retries} attempts. "
+                                f"Last error: {last_error}"
+                            ),
+                            attempts=self.max_retries,
+                        )
 
 
     def _call_llm(self, prompt: str) -> str:

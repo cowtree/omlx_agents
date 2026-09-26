@@ -24,25 +24,21 @@ configured on this machine.
 
 ### Learnings: structured output agent
 
-- **Structured output:** the LLM returns JSON matching a Pydantic model instead
-  of free text, so code can use the result directly.
+The agent covers six parts of a reliable-LLM-output challenge:
+
+| Challenge | How it's done |
+|---|---|
+| Reliable outputs | A Pydantic model is the contract; its JSON schema goes into the prompt |
+| Schema validation | `model_validate_json()` checks JSON, fields, `Literal` values and limits |
+| Error handling | API failures and validation failures are handled separately |
+| Retry logic | API retry with backoff (1s, 2s) + semantic repair: the validation error is fed back so the model fixes its own answer |
+| Logging | Python `logging`; validation attempts and API attempts are logged separately, with response times and token counts |
+| Continue safely | `run()` returns an `AgentResult` (`success`, `data`, `error`, `attempts`), so one bad item doesn't stop a batch |
+
+Also worth knowing:
+
 - **Generic over the output model:** `agent.run(prompt, output_model)` works with
-  any Pydantic model (article analysis, entity extraction, ...). New task = new
-  model, no agent changes.
-- **The schema is the prompt:** `model_json_schema()` puts field types,
-  descriptions and limits into the prompt, so prompt and validation can't drift
-  apart.
-- **Validation with Pydantic:** raw LLM output is never trusted;
-  `model_validate_json()` checks JSON, fields, `Literal` values and limits.
-- **Agentic loop with self-repair:** on invalid output, the agent sends the
-  model its previous answer plus the validation error and asks it to fix it, up
-  to `max_retries` times.
-- **API retries with backoff:** connection errors, timeouts and rate limits are
-  retried separately, waiting 1s, then 2s.
-- **Fail loudly:** after the last attempt the agent raises instead of returning
-  `None`.
-- **Logging:** each validation attempt and API attempt is logged, with response
-  times and token counts.
+  any Pydantic model. New task = new model, no agent changes.
 - **Config injection:** `main.py` reads `.env` and passes the client, model and
   thinking setting in; the agent has no config of its own.
 
