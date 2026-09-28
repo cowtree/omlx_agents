@@ -23,6 +23,30 @@ configured on this machine.
 | `structured_output_agent/` | Turns text into validated Pydantic objects, for any output model | [docs/structured-output-agent.md](docs/structured-output-agent.md) |
 | `rag-citation-agent/` | Finds the documents that answer a question, with their sources (work in progress) | |
 
+## Roadmap
+
+Twelve agent patterns, built one at a time. The rule for all of them: **open
+models only**, running locally. No paid model APIs.
+
+| # | Agent | Status | Open-source approach |
+|---|---|---|---|
+| 1 | Structured output | ✅ Done | Qwen3.6-35B-A3B on oMLX; Pydantic validation with retries |
+| 2 | RAG with citations | 🚧 Retrieval done | Open embedding model (e.g. `bge-small`, `nomic-embed`) via `sentence-transformers`; web fallback via DuckDuckGo or self-hosted SearXNG |
+| 3 | ReAct planning | Planned | Local model; iteration limits, loop detection, graceful failure |
+| 4 | Multi-tool orchestrator | Planned | Tool registry with OpenAI-style tool calling (Qwen3 supports it); email and calendar tools are fakes |
+| 5 | Memory-enabled conversation | Planned | Same embedding model as RAG; SQLite for long-term memory |
+| 6 | Human-in-the-loop approval | Planned | Local model; confidence threshold, pause/resume, audit log |
+| 7 | Cost-aware router | Planned | A small model (e.g. Qwen3-4B) and a large one (the 35B); local models have no API price, so "cost" is latency, tokens/s and memory |
+| 8 | Event-triggered automation | Planned | FastAPI webhook, queue with retries, dead-letter handling and idempotency |
+| 9 | Multi-agent debate | Planned | Several agents (different prompts or different open models) plus a critic |
+| 10 | Self-reflective with auto-evaluation | Planned | Generate, judge, rewrite; the local model acts as its own judge |
+| 11 | Production observability | Planned | Self-hosted Langfuse or Arize Phoenix for tracing, token and latency dashboards |
+| 12 | Open-source framework contribution | Planned | A pull request to LangGraph, CrewAI or AutoGen; linked here, not code in this repo |
+
+Each agent gets its own folder, with the same layout as
+`structured_output_agent/`. Shared setup (oMLX client, `.env` loading, logging)
+will move into a `common/` folder once more agents need it.
+
 ### Learnings: structured output agent
 
 The agent covers six parts of a reliable-LLM-output challenge:
