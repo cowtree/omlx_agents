@@ -1,46 +1,53 @@
-from app.models import Document
+import re
+
+from app.models import Chunk, RetrievalResult
+
+
+def tokenize(text: str) -> set[str]:
+    return set(re.findall(r"\w+", text.lower()))
+
 
 class Retriever:
 
-    def __init__(self, documents: list[Document]):
-        self.documents = documents
+    def __init__(self, chunks: list[Chunk]):
+        self.chunks = chunks
 
     def search(
         self,
         query: str,
         top_k: int = 3,
-    ) -> list[Document]:
-        """
-        Retrieve the most relevant documents based on the query.
-        This is a simple keyword-based retrieval for demonstration purposes.
-        """
-        # Simple keyword-based retrieval
-        
-        query_words = set(query.lower().split())
+        min_score: float = 0.0,
+    ) -> list[RetrievalResult]:
 
-        scored_documents = []
+        query_words = tokenize(query)
 
-        for document in self.documents:
+        if not query_words:
+            return []
 
-            document_words = set(
-                document.content.lower().split()
+        results = []
+
+        for chunk in self.chunks:
+
+            chunk_words = tokenize(chunk.content)
+
+            matches = query_words.intersection(
+                chunk_words
             )
 
-            score = len(
-                query_words.intersection(document_words)
-            )
+            score = len(matches) / len(query_words)
 
-            scored_documents.append(
-                (score, document)
-            )
+            if score > min_score:
 
-        scored_documents.sort(
-            key=lambda item: item[0],
-            reverse=True
+                results.append(
+                    RetrievalResult(
+                        chunk=chunk,
+                        score=score,
+                    )
+                )
+
+        results.sort(
+            key=lambda result: result.score,
+            reverse=True,
         )
-    
-        return [
-            document
-            for score, document in scored_documents[:top_k]
-            if score > 0
-        ]
+
+        return results[:top_k]

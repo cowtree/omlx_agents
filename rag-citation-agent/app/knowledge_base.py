@@ -15,13 +15,23 @@ DOCUMENTS = [
     ),
 
     Document(
-        id="doc-002",
-        title="Vacation Policy",
-        content=(
-            "Full-time employees receive 25 days of paid "
-            "vacation per calendar year."
-        ),
-        source="employee_handbook.md",
+    id="doc-002",
+    title="Vacation Policy",
+    content=(
+        "The company encourages employees to take regular "
+        "time away from work to maintain a healthy work-life "
+        "balance. Vacation should normally be planned in "
+        "advance with the employee's manager. "
+
+        "Full-time employees receive 25 days of paid vacation "
+        "per calendar year. Part-time employees receive vacation "
+        "on a proportional basis. "
+
+        "Employees should submit vacation requests through the "
+        "HR system. Requests longer than two consecutive weeks "
+        "require additional manager approval."
+    ),
+    source="employee_handbook.md",
     ),
 
     Document(
