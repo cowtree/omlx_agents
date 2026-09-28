@@ -21,6 +21,7 @@ configured on this machine.
 |---|---|---|
 | `main.py` | Basic chat completion against the local model | |
 | `structured_output_agent/` | Turns text into validated Pydantic objects, for any output model | [docs/structured-output-agent.md](docs/structured-output-agent.md) |
+| `rag-citation-agent/` | Finds the documents that answer a question, with their sources (work in progress) | |
 
 ### Learnings: structured output agent
 
@@ -44,6 +45,24 @@ Also worth knowing:
 
 See [docs/structured-output-agent.md](docs/structured-output-agent.md) for how
 it works, example logs and known limitations.
+
+### Learnings: RAG citation agent (work in progress)
+
+So far this covers the retrieval half of RAG: finding the text that answers a
+question and remembering where it came from. There is no model call yet.
+
+| Step | How it's done |
+|---|---|
+| Knowledge base | A small set of policy `Document`s, each with an `id`, `title`, `content` and `source` file |
+| Chunking | `chunk_documents()` splits each document into overlapping word windows (`chunk_size`, `chunk_overlap`); each `Chunk` keeps its `document_id` and `source` for citations |
+| Retrieval | `Retriever.search()` scores each chunk by the share of question words it contains and returns the `top_k` best as `RetrievalResult`s |
+| Relevance cut-off | `min_score` drops weak matches, so a question the knowledge base can't answer returns nothing instead of a wrong document |
+
+Known limitations:
+
+- **Keyword matching only:** "holiday" won't find the vacation policy. Embeddings would fix this.
+- **Every word counts:** words like "the" and "is", and the "s" left over from "company's", count towards the score. That lowers it for longer questions.
+- **No answer yet:** the next step is to send the retrieved chunks to the model and have it answer with citations.
 
 ## Getting started
 
@@ -70,7 +89,9 @@ Requires [uv](https://docs.astral.sh/uv/) and a running oMLX server.
    uv run main.py
    ```
 
-   The basic chat script runs from the project root with `uv run main.py`.
+   The RAG citation agent runs the same way from `rag-citation-agent/`. It
+   doesn't need the oMLX server yet. The basic chat script runs from the
+   project root with `uv run main.py`.
 
 ### Running tests
 
